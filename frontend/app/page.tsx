@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import {
   GitPullRequest, Bug, Shield, Zap, Star, Activity,
-  ArrowUpRight, Clock, TrendingUp, Sparkles
+  ArrowUpRight, Clock, Sparkles,
 } from 'lucide-react';
 import StatCard from '@/components/cards/StatCard';
 import PRCard from '@/components/cards/PRCard';
@@ -11,9 +11,8 @@ import { ChartCard, ReviewTrendChart, DonutChart } from '@/components/charts/Cha
 import Navbar from '@/components/layout/Navbar';
 import {
   mockStats, mockPullRequests, mockReviewTrend,
-  mockSeverityDistribution, mockCategoryDistribution, mockNotifications,
+  mockSeverityDistribution, mockCategoryDistribution,
 } from '@/lib/mock-data';
-import { formatRelativeTime } from '@/lib/utils';
 import Link from 'next/link';
 
 const recentActivity = [
@@ -28,35 +27,44 @@ export default function DashboardPage() {
   const recentPRs = mockPullRequests.slice(0, 4);
 
   return (
-    <div className="flex flex-col min-h-full">
+    <>
       <Navbar title="Dashboard" />
 
-      <div className="flex-1 px-5 py-6 space-y-6 max-w-[1400px] mx-auto w-full">
+      <div className="px-6 py-6 pb-12 space-y-6">
 
-        {/* ── Welcome banner ─────────────────────────────── */}
+        {/* ── Welcome Banner ─────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass rounded-2xl p-5 relative overflow-hidden"
+          transition={{ duration: 0.4 }}
+          className="glass rounded-2xl p-6 relative overflow-hidden"
         >
-          {/* Background glow */}
-          <div className="absolute -right-20 -top-20 w-60 h-60 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -right-4 -bottom-10 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+          {/* Decorative glows */}
+          <div className="absolute -right-16 -top-16 w-56 h-56 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute right-8 -bottom-8 w-36 h-36 bg-purple-500/8 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="relative flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Sparkles className="w-4 h-4 text-blue-400" />
-                <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">AI Code Review Platform</span>
+          <div className="relative flex items-center gap-6">
+            {/* Left text block */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">
+                  AI Code Review Platform
+                </span>
               </div>
-              <h2 className="text-xl font-bold text-white mb-1">Good morning, Krishna 👋</h2>
+              <h2 className="text-xl font-bold text-white mb-1">
+                Good morning, Krishna 👋
+              </h2>
               <p className="text-sm text-zinc-400">
-                <span className="text-amber-400 font-medium">3 pull requests</span> waiting for review. Last review completed 2 hours ago.
+                <span className="text-amber-400 font-semibold">3 pull requests</span>{' '}
+                waiting for review. Last review completed 2 hours ago.
               </p>
             </div>
+
+            {/* CTA Button — flex-shrink-0 so it never wraps */}
             <Link
               href="/pull-requests"
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-xl text-sm font-medium transition-all duration-200 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)] group"
+              className="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/25 hover:bg-blue-500/20 transition-all duration-200 hover:shadow-[0_0_24px_rgba(59,130,246,0.2)] group"
             >
               View All PRs
               <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -64,8 +72,13 @@ export default function DashboardPage() {
           </div>
         </motion.div>
 
-        {/* ── Stats grid ─────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        {/* ── Stats Row ──────────────────────────────── */}
+        {/*
+          6 equal-width cards in a row.
+          2 cols on mobile → 3 on md → 6 on lg.
+          All cards are h-[160px] so they're perfectly uniform.
+        */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <StatCard
             title="Total Pull Requests"
             value={mockStats.total_prs}
@@ -116,43 +129,38 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* ── Main content grid ───────────────────────────── */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+        {/* ── Main Content: PRs (left) + Charts (right) ── */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
 
-          {/* Left: Recent PRs */}
+          {/* Left 2/3 — Recent Pull Requests */}
           <div className="xl:col-span-2 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-white">Recent Pull Requests</h2>
-              <Link href="/pull-requests" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+              <Link
+                href="/pull-requests"
+                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+              >
                 View all <ArrowUpRight className="w-3 h-3" />
               </Link>
             </div>
             <div className="space-y-3">
-              {recentPRs.map((pr, i) => <PRCard key={pr.id} pr={pr} index={i} />)}
+              {recentPRs.map((pr, i) => (
+                <PRCard key={pr.id} pr={pr} index={i} />
+              ))}
             </div>
           </div>
 
-          {/* Right: Charts + Activity */}
+          {/* Right 1/3 — Charts + Activity */}
           <div className="space-y-4">
-            {/* Trend Chart */}
-            <ChartCard
-              title="Review Trend"
-              subtitle="Last 14 days"
-              delay={0.2}
-            >
+            <ChartCard title="Review Trend" subtitle="Last 14 days" delay={0.2}>
               <ReviewTrendChart data={mockReviewTrend} />
             </ChartCard>
 
-            {/* Severity distribution */}
-            <ChartCard
-              title="Severity Distribution"
-              subtitle="All time issues"
-              delay={0.3}
-            >
+            <ChartCard title="Severity Distribution" subtitle="All time" delay={0.3}>
               <DonutChart data={mockSeverityDistribution} />
             </ChartCard>
 
-            {/* Activity feed */}
+            {/* Activity Feed */}
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -172,9 +180,13 @@ export default function DashboardPage() {
                     transition={{ delay: 0.45 + i * 0.05 }}
                     className="flex items-start gap-2.5"
                   >
-                    <span className="text-base flex-shrink-0 mt-0.5">{item.icon}</span>
+                    <span className="text-base flex-shrink-0 leading-none mt-0.5">
+                      {item.icon}
+                    </span>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-xs leading-relaxed ${item.color}`}>{item.text}</p>
+                      <p className={`text-xs leading-relaxed ${item.color}`}>
+                        {item.text}
+                      </p>
                       <p className="text-[10px] text-zinc-600 mt-0.5">{item.time}</p>
                     </div>
                   </motion.div>
@@ -184,31 +196,32 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Category breakdown ──────────────────────────── */}
+        {/* ── Category Breakdown ─────────────────────── */}
         <ChartCard
           title="Issue Category Breakdown"
           subtitle="Distribution across all reviewed pull requests"
           delay={0.5}
         >
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 mt-2">
+          {/* 7 equal columns on large screens, 4 on medium, 2 on small */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mt-2">
             {mockCategoryDistribution.map((cat, i) => (
               <motion.div
                 key={cat.name}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.55 + i * 0.04 }}
-                className="text-center p-3 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/60 transition-colors"
+                className="flex flex-col items-center p-3 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/60 transition-colors"
               >
-                <div
-                  className="text-2xl font-bold mb-1"
-                  style={{ color: cat.color }}
-                >
+                <span className="text-xl font-bold" style={{ color: cat.color }}>
                   {cat.value}
-                </div>
-                <div className="text-[10px] text-zinc-400 font-medium leading-tight">{cat.name}</div>
+                </span>
+                <span className="text-[10px] text-zinc-400 font-medium mt-0.5 text-center leading-tight">
+                  {cat.name}
+                </span>
+                {/* Progress bar */}
                 <div
-                  className="mt-2 h-1 rounded-full"
-                  style={{ background: cat.color + '40' }}
+                  className="mt-2 w-full h-1 rounded-full"
+                  style={{ background: cat.color + '25' }}
                 >
                   <motion.div
                     className="h-full rounded-full"
@@ -223,6 +236,6 @@ export default function DashboardPage() {
           </div>
         </ChartCard>
       </div>
-    </div>
+    </>
   );
 }

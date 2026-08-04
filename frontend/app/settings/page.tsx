@@ -109,10 +109,10 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-full">
+    <>
       <Navbar title="Settings" />
 
-      <div className="flex-1 px-5 py-6 max-w-[800px] mx-auto w-full space-y-5">
+      <div className="px-6 py-6 pb-12 max-w-[820px] space-y-5">
 
         {/* Header */}
         <motion.div
@@ -273,6 +273,6 @@ export default function SettingsPage() {
           </div>
         </SettingsSection>
       </div>
-    </div>
+    </>
   );
 }

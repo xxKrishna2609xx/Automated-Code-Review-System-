@@ -41,10 +41,10 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   const countBySeverity = (sev: Severity) => allIssues.filter(i => i.severity === sev).length;
 
   return (
-    <div className="flex flex-col min-h-full">
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar title={`AI Review — PR #${pr.number}`} />
 
-      <div className="flex-1 flex overflow-hidden">
+      <div style={{ flex: 1, display: 'flex', height: 'calc(100vh - 64px)' }}>
 
         {/* ── Left column: diff file tree ─────────────────── */}
         <div className="w-64 flex-shrink-0 border-r border-zinc-800/60 glass-strong overflow-y-auto p-3 hidden lg:block">

@@ -18,10 +18,10 @@ export default function AnalyticsPage() {
   }));
 
   return (
-    <div className="flex flex-col min-h-full">
+    <>
       <Navbar title="Analytics" />
 
-      <div className="flex-1 px-5 py-6 max-w-[1400px] mx-auto w-full space-y-5">
+      <div className="px-6 py-6 pb-12 space-y-5">
 
         {/* Header */}
         <motion.div
@@ -129,6 +129,6 @@ export default function AnalyticsPage() {
           </div>
         </motion.div>
       </div>
-    </div>
+    </>
   );
 }

@@ -48,10 +48,10 @@ export default function PullRequestsPage() {
     });
 
   return (
-    <div className="flex flex-col min-h-full">
+    <>
       <Navbar title="Pull Requests" />
 
-      <div className="flex-1 px-5 py-6 max-w-[1200px] mx-auto w-full space-y-5">
+      <div className="px-6 py-6 pb-12 space-y-5">
 
         {/* Header */}
         <motion.div
@@ -150,6 +150,6 @@ export default function PullRequestsPage() {
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }

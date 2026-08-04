@@ -33,7 +33,7 @@ export default function Sidebar() {
     <motion.aside
       animate={{ width: collapsed ? 64 : 220 }}
       transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="glass-strong flex flex-col border-r border-zinc-800/60 h-screen sticky top-0 z-30 overflow-hidden flex-shrink-0"
+      className="glass-strong flex flex-col border-r border-zinc-800/60 sticky top-0 h-screen z-30 overflow-hidden flex-shrink-0"
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-zinc-800/60 min-h-[64px]">
