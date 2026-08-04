@@ -51,6 +51,7 @@ from app.prompts.review_prompt import (
     build_chunk_prompt,
     build_review_prompt,
 )
+from app.utils import extract_json_from_text, split_diff_into_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -84,89 +85,7 @@ class EmptyDiffError(GeminiServiceError):
     """Raised when the supplied diff is empty after normalisation."""
 
 
-# ---------------------------------------------------------------------------
-# Helper utilities
-# ---------------------------------------------------------------------------
 
-
-def _extract_json_from_text(text: str) -> str:
-    """Extract a JSON object from raw Gemini text.
-
-    Gemini occasionally wraps its JSON in Markdown fences despite being
-    instructed not to.  This function strips any such wrapping.
-
-    Strategy:
-        1. Try to find content between ```json … ``` fences.
-        2. Fall back to locating the first ``{`` … last ``}`` pair.
-        3. Return the raw text if neither pattern matches.
-
-    Args:
-        text: Raw text returned by the Gemini API.
-
-    Returns:
-        A string that should parse as valid JSON.
-    """
-    # Strategy 1 — Markdown code fence
-    fence_pattern = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```", re.IGNORECASE)
-    match = fence_pattern.search(text)
-    if match:
-        return match.group(1).strip()
-
-    # Strategy 2 — Locate first { … last }
-    first_brace = text.find("{")
-    last_brace = text.rfind("}")
-    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-        return text[first_brace : last_brace + 1].strip()
-
-    # Strategy 3 — Return as-is and let the JSON parser fail with a clear error
-    return text.strip()
-
-
-def _split_diff_into_chunks(diff: str, max_chars: int, overlap_lines: int) -> list[str]:
-    """Split a large unified diff into overlapping string chunks.
-
-    Each chunk stays under ``max_chars`` characters.  Adjacent chunks share
-    ``overlap_lines`` lines so context is not lost at boundaries.
-
-    Args:
-        diff         : Full unified diff string.
-        max_chars    : Maximum character length per chunk.
-        overlap_lines: Number of trailing lines from the previous chunk
-                       to prepend to the next chunk.
-
-    Returns:
-        List of diff chunk strings.  Returns a single-element list when the
-        diff fits within ``max_chars``.
-    """
-    if len(diff) <= max_chars:
-        return [diff]
-
-    lines = diff.splitlines(keepends=True)
-    chunks: list[str] = []
-    current_lines: list[str] = []
-    current_chars = 0
-
-    for line in lines:
-        if current_chars + len(line) > max_chars and current_lines:
-            chunks.append("".join(current_lines))
-            # Keep the last `overlap_lines` lines for context continuity
-            tail = current_lines[-overlap_lines:] if overlap_lines > 0 else []
-            current_lines = list(tail)
-            current_chars = sum(len(l) for l in current_lines)
-
-        current_lines.append(line)
-        current_chars += len(line)
-
-    if current_lines:
-        chunks.append("".join(current_lines))
-
-    logger.info(
-        "Diff split into %d chunk(s) (total chars=%d, max_chars=%d).",
-        len(chunks),
-        len(diff),
-        max_chars,
-    )
-    return chunks
 
 
 # ---------------------------------------------------------------------------
@@ -236,7 +155,7 @@ class GeminiService:
                 "Cannot review an empty diff.  Supply a non-empty Git patch."
             )
 
-        chunks = _split_diff_into_chunks(
+        chunks = split_diff_into_chunks(
             diff=diff,
             max_chars=self._config.max_diff_chars,
             overlap_lines=self._config.chunk_overlap_lines,
@@ -487,7 +406,7 @@ class GeminiService:
         """
         logger.debug("Parsing Gemini response (%d chars).", len(raw_text))
 
-        json_str = _extract_json_from_text(raw_text)
+        json_str = extract_json_from_text(raw_text)
 
         try:
             data: dict[str, Any] = json.loads(json_str)

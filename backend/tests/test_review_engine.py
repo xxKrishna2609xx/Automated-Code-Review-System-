@@ -137,12 +137,12 @@ index e69de29..abc1234 100644
 --- a/app/utils/math_utils.py
 +++ b/app/utils/math_utils.py
 @@ -0,0 +1,20 @@
-+"""Math utility functions."""
++'''Math utility functions.'''
 +from __future__ import annotations
 +
 +
 +def safe_divide(numerator: float, denominator: float) -> float:
-+    """Divide two numbers safely.
++    '''Divide two numbers safely.
 +
 +    Args:
 +        numerator: The dividend.
@@ -153,7 +153,7 @@ index e69de29..abc1234 100644
 +
 +    Raises:
 +        ValueError: When denominator is zero.
-+    """
++    '''
 +    if denominator == 0:
 +        raise ValueError("Cannot divide by zero.")
 +    return numerator / denominator

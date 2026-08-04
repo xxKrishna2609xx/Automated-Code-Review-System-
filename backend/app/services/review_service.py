@@ -36,6 +36,11 @@ from app.ai.gemini_service import (
     GeminiTimeoutError,
 )
 from app.models.review_models import Issue, ReviewRequest, ReviewResponse, Severity
+from app.utils import (
+    detect_language_from_diff,
+    normalise_diff,
+    sort_and_deduplicate_issues,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -155,12 +160,6 @@ class ReviewService:
     ) -> tuple[str, Optional[str]]:
         """Normalise the diff and infer metadata before sending to Gemini.
 
-        Normalisation steps:
-        • Strip trailing whitespace from each line (reduces token waste).
-        • Remove ``\r`` carriage returns for consistent line handling.
-        • Detect primary language from file extensions in the diff headers
-          when ``language_hint`` was not provided by the caller.
-
         Args:
             request: Incoming ``ReviewRequest``.
 
@@ -170,11 +169,7 @@ class ReviewService:
         Raises:
             EmptyDiffError: Diff is empty after normalisation.
         """
-        # Normalise line endings
-        diff = request.diff.replace("\r\n", "\n").replace("\r", "\n")
-
-        # Strip trailing whitespace per line (preserves leading +/- markers)
-        diff = "\n".join(line.rstrip() for line in diff.splitlines())
+        diff = normalise_diff(request.diff)
 
         if not diff.strip():
             raise EmptyDiffError(
@@ -182,69 +177,8 @@ class ReviewService:
                 "Ensure the patch is a valid unified diff."
             )
 
-        # Resolve language hint
-        language_hint = request.language_hint or self._detect_language(diff)
-
+        language_hint = request.language_hint or detect_language_from_diff(diff)
         return diff, language_hint
-
-    @staticmethod
-    def _detect_language(diff: str) -> Optional[str]:
-        """Heuristically detect the primary programming language from diff headers.
-
-        Parses ``--- a/path/to/file.ext`` and ``+++ b/path/to/file.ext`` lines
-        to collect file extensions, then returns the most common one's language.
-
-        Args:
-            diff: Normalised unified diff string.
-
-        Returns:
-            Human-readable language name (e.g. ``"Python"``), or ``None`` when
-            detection is inconclusive.
-        """
-        ext_to_language: dict[str, str] = {
-            ".py": "Python",
-            ".ts": "TypeScript",
-            ".tsx": "TypeScript",
-            ".js": "JavaScript",
-            ".jsx": "JavaScript",
-            ".java": "Java",
-            ".kt": "Kotlin",
-            ".go": "Go",
-            ".rs": "Rust",
-            ".cpp": "C++",
-            ".cc": "C++",
-            ".c": "C",
-            ".cs": "C#",
-            ".rb": "Ruby",
-            ".php": "PHP",
-            ".swift": "Swift",
-            ".scala": "Scala",
-            ".sh": "Shell",
-            ".yaml": "YAML",
-            ".yml": "YAML",
-            ".json": "JSON",
-            ".sql": "SQL",
-            ".tf": "Terraform",
-            ".html": "HTML",
-            ".css": "CSS",
-        }
-
-        extension_counts: dict[str, int] = {}
-        for line in diff.splitlines():
-            if line.startswith(("--- a/", "+++ b/", "--- ", "+++ ")):
-                filename = line.split(" ", 1)[-1].strip()
-                # Strip git prefixes like "a/" and "b/"
-                filename = filename.lstrip("ab/")
-                if "." in filename:
-                    ext = "." + filename.rsplit(".", 1)[-1].lower()
-                    if ext in ext_to_language:
-                        extension_counts[ext] = extension_counts.get(ext, 0) + 1
-
-        if not extension_counts:
-            return None
-
-        dominant_ext = max(extension_counts, key=extension_counts.__getitem__)
-        return ext_to_language.get(dominant_ext)
 
     # ------------------------------------------------------------------
     # Private: Post-processing
@@ -255,8 +189,8 @@ class ReviewService:
 
         Operations performed:
         1. Sort issues by severity (Critical → Low).
-        2. Deduplicate near-identical issues (same title + line).
-        3. Rebuild ``total_issues`` count.
+        2. Deduplicate near-identical issues.
+        3. Rebuild ``ReviewResponse``.
 
         Args:
             response: Raw ``ReviewResponse`` from Gemini.
@@ -264,30 +198,10 @@ class ReviewService:
         Returns:
             Post-processed ``ReviewResponse``.
         """
-        # 1. Deduplicate
-        seen: set[tuple[str, Optional[int]]] = set()
-        deduped_issues: list[Issue] = []
-        for issue in response.issues:
-            key = (issue.title.lower().strip(), issue.line)
-            if key not in seen:
-                seen.add(key)
-                deduped_issues.append(issue)
-            else:
-                logger.debug(
-                    "Duplicate issue removed — title=%r line=%s",
-                    issue.title, issue.line,
-                )
-
-        # 2. Sort: Critical first, Low last
-        sorted_issues = sorted(
-            deduped_issues,
-            key=lambda i: _SEVERITY_ORDER.get(i.severity, 99),
-        )
-
-        # 3. Rebuild response with post-processed issues
+        processed_issues = sort_and_deduplicate_issues(response.issues)
         return ReviewResponse(
             summary=response.summary,
-            issues=sorted_issues,
+            issues=processed_issues,
             reviewed_chunks=response.reviewed_chunks,
         )
 
