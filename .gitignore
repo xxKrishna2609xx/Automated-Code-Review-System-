@@ -1,0 +1,143 @@
+# ============================================================
+#  Automated Code Review — .gitignore
+#  Stacks: Python (FastAPI/uvicorn) · Next.js (TypeScript)
+# ============================================================
+
+# ─── Environment & Secrets ───────────────────────────────────
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.cert
+
+# ─── Python / Backend ────────────────────────────────────────
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Byte-compiled / optimised / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+MANIFEST
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.lcov
+
+# Linting / type checking
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+# Python tooling
+.pdm-python
+.pdm-build
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# ─── Node.js / Frontend ──────────────────────────────────────
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+.swc/
+
+# Build output
+build/
+dist/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Package manager locks (keep the one you use; remove others)
+# npm  → keep package-lock.json
+# yarn → keep yarn.lock
+# pnpm → keep pnpm-lock.yaml
+yarn.lock
+pnpm-lock.yaml
+
+# Vercel
+.vercel/
+
+# Turbo
+.turbo/
+
+# ─── OS & Editors ────────────────────────────────────────────
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains / PyCharm / WebStorm
+.idea/
+*.iml
+
+# Vim / Neovim
+*.swp
+*.swo
+Session.vim
+
+# ─── Logs & Temp Files ───────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.pid
+*.seed
+*.pid.lock
+
+# ─── Docker ──────────────────────────────────────────────────
+docker-compose.override.yml
+.dockerignore
+
+# ─── Misc ────────────────────────────────────────────────────
+*.bak
+*.tmp
+*.orig
+*.swp
+.cache/
+tmp/
+temp/
