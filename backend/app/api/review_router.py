@@ -29,7 +29,9 @@ from app.ai.gemini_service import (
     GeminiServiceError,
     GeminiTimeoutError,
 )
+from app.models.github_models import GitHubPublishResult
 from app.models.review_models import ReviewRequest, ReviewResponse
+from app.services.publish_service import PublishService
 from app.services.review_service import ReviewService, get_review_service
 
 logger = logging.getLogger(__name__)
@@ -105,6 +107,54 @@ async def review_diff(
     except GeminiServiceError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+
+
+
+
+def get_publish_service(
+    svc: ReviewService = Depends(get_review_service),
+) -> PublishService:
+    """Dependency provider for PublishService."""
+    return PublishService(review_service=svc)
+
+
+@router.post(
+    "/review/publish",
+    response_model=GitHubPublishResult,
+    summary="Review a Git diff and publish findings to a GitHub PR",
+    description=(
+        "Accepts a raw Git unified diff and GitHub PR metadata (owner, repo, pull_number), "
+        "runs the AI review engine, formats inline comments & summary markdown, and "
+        "publishes the review directly to the GitHub PR."
+    ),
+)
+async def review_and_publish_pr(
+    request: ReviewRequest,
+    owner: str,
+    repo: str,
+    pull_number: int,
+    publish_svc: PublishService = Depends(get_publish_service),
+) -> GitHubPublishResult:
+    """Run AI code review and publish findings directly to GitHub PR."""
+    logger.info("POST /review/publish — owner=%s repo=%s pr=%d", owner, repo, pull_number)
+    try:
+        return await publish_svc.review_and_publish(
+            request=request,
+            owner=owner,
+            repo=repo,
+            pull_number=pull_number,
+        )
+    except EmptyDiffError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.error("Failed to execute review and publish pipeline: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(exc),
         ) from exc
 

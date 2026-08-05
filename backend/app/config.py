@@ -126,6 +126,22 @@ class Settings(BaseSettings):
         description="Deployment environment: development | staging | production.",
     )
 
+    # ── GitHub Integration ──────────────────────────────────────────────
+    github_token: Optional[str] = Field(
+        default=None,
+        description="GitHub Personal Access Token or App Installation token.",
+    )
+    github_api_url: str = Field(
+        default="https://api.github.com",
+        description="Base URL for the GitHub REST API.",
+    )
+    github_timeout_seconds: int = Field(
+        default=30,
+        ge=5,
+        le=180,
+        description="HTTP request timeout for GitHub API calls (seconds).",
+    )
+
     # ── Pydantic settings config ─────────────────────────────────────────
     model_config = SettingsConfigDict(
         env_file=".env",
