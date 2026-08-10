@@ -98,38 +98,9 @@ def create_app() -> FastAPI:
         return response
 
     # ── Global exception handlers ────────────────────────────────────────
-    from app.ai.gemini_service import (
-        EmptyDiffError,
-        GeminiAuthError,
-        GeminiParseError,
-        GeminiRateLimitError,
-        GeminiServiceError,
-        GeminiTimeoutError,
-    )
+    from app.utils import register_exception_handlers
 
-    @app.exception_handler(EmptyDiffError)
-    async def empty_diff_handler(request: Request, exc: EmptyDiffError):
-        return JSONResponse(status_code=422, content={"detail": str(exc)})
-
-    @app.exception_handler(GeminiAuthError)
-    async def auth_error_handler(request: Request, exc: GeminiAuthError):
-        return JSONResponse(status_code=500, content={"detail": "Gemini authentication failed.  Check GEMINI_API_KEY."})
-
-    @app.exception_handler(GeminiRateLimitError)
-    async def rate_limit_handler(request: Request, exc: GeminiRateLimitError):
-        return JSONResponse(status_code=429, content={"detail": "Gemini API quota exhausted.  Please retry later."})
-
-    @app.exception_handler(GeminiTimeoutError)
-    async def timeout_handler(request: Request, exc: GeminiTimeoutError):
-        return JSONResponse(status_code=504, content={"detail": "Gemini API timed out.  Please retry."})
-
-    @app.exception_handler(GeminiParseError)
-    async def parse_error_handler(request: Request, exc: GeminiParseError):
-        return JSONResponse(status_code=502, content={"detail": f"Failed to parse Gemini response: {exc}"})
-
-    @app.exception_handler(GeminiServiceError)
-    async def gemini_service_error_handler(request: Request, exc: GeminiServiceError):
-        return JSONResponse(status_code=502, content={"detail": str(exc)})
+    register_exception_handlers(app)
 
     # ── Routers ──────────────────────────────────────────────────────────
     app.include_router(review_router, prefix="/api/v1", tags=["Review"])
