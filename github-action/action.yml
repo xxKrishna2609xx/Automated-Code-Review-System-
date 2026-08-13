@@ -1,0 +1,61 @@
+name: 'AI Code Review Engine'
+description: 'Automated Gemini AI Code Review Engine with GitHub Inline Review Publishing'
+author: 'AI Code Review System'
+
+inputs:
+  backend_url:
+    description: 'FastAPI Backend URL (e.g. https://your-domain.ngrok-free.app or production server)'
+    required: true
+    default: 'http://localhost:8000'
+  github_token:
+    description: 'GitHub Token for authentication'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Extract PR Diff
+      shell: bash
+      run: |
+        git diff origin/${{ github.base_ref }}...HEAD > pr_diff.patch
+
+    - name: Call AI Review API & Publish Comments
+      shell: bash
+      env:
+        BACKEND_URL: ${{ inputs.backend_url }}
+      run: |
+        python3 -c "
+        import json, os, urllib.request
+
+        backend_url = '${{ inputs.backend_url }}'
+        with open('pr_diff.patch', 'r', encoding='utf-8') as f:
+            diff_text = f.read()
+
+        payload = {
+            'diff': diff_text,
+            'pr_title': '''${{ github.event.pull_request.title }}''',
+            'pr_description': '''${{ github.event.pull_request.body }}'''
+        }
+
+        owner = '${{ github.repository_owner }}'
+        repo = '${{ github.event.repository.name }}'
+        pr_num = ${{ github.event.pull_request.number }}
+
+        url = f'{backend_url.rstrip(\"/\")}/api/v1/review/publish?owner={owner}&repo={repo}&pull_number={pr_num}'
+        print('Publishing AI review to:', url)
+
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
+        )
+
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            print('Status:', resp.status)
+            print(resp.read().decode('utf-8'))
+        "

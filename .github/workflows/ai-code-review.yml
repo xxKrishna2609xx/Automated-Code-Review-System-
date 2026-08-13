@@ -1,0 +1,71 @@
+name: AI Code Review Bot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  ai-code-review:
+    name: Run Gemini AI Code Review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract Git Unified Diff
+        id: extract_diff
+        run: |
+          git diff origin/${{ github.base_ref }}...HEAD > pr_diff.patch
+          echo "Extracted diff patch file ($(wc -l < pr_diff.patch) lines)."
+
+      - name: Trigger AI Review & Publish Comments to GitHub PR
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+        run: |
+          python3 -c "
+          import json, os, urllib.request
+
+          backend_url = os.environ.get('BACKEND_URL', 'http://localhost:8000')
+          
+          with open('pr_diff.patch', 'r', encoding='utf-8') as f:
+              diff_text = f.read()
+
+          if not diff_text.strip():
+              print('Empty diff patch. Skipping review.')
+              exit(0)
+
+          payload = {
+              'diff': diff_text,
+              'pr_title': '''${{ github.event.pull_request.title }}''',
+              'pr_description': '''${{ github.event.pull_request.body }}'''
+          }
+
+          owner = '${{ github.repository_owner }}'
+          repo = '${{ github.event.repository.name }}'
+          pr_num = ${{ github.event.pull_request.number }}
+
+          target_url = f'{backend_url.rstrip(\"/\")}/api/v1/review/publish?owner={owner}&repo={repo}&pull_number={pr_num}'
+          print(f'Sending request to: {target_url}')
+
+          req = urllib.request.Request(
+              target_url,
+              data=json.dumps(payload).encode('utf-8'),
+              headers={'Content-Type': 'application/json'}
+          )
+
+          try:
+              with urllib.request.urlopen(req, timeout=120) as resp:
+                  print('API Status Code:', resp.status)
+                  result = json.loads(resp.read().decode('utf-8'))
+                  print('Published Review Event:', result.get('event'))
+                  print('Comments Published:', len(result.get('published_comments', [])))
+          except Exception as exc:
+              print('Error invoking AI review backend:', exc)
+              raise exc
+          "
