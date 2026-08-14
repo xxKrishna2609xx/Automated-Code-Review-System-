@@ -141,3 +141,6 @@ docker-compose.override.yml
 .cache/
 tmp/
 temp/
+
+
+Phase_6_AntiGravity_Implementation_Spec.md

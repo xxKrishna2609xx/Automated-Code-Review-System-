@@ -197,19 +197,34 @@ class GeminiService:
         assert merged is not None
         return merged
 
+    async def generate_custom_review(
+        self,
+        user_prompt: str,
+        system_instruction: Optional[str] = None,
+    ) -> tuple[str, list[Issue]]:
+        """Generate a custom review with specialized system prompt for multi-agent review."""
+        model = self._client
+        if system_instruction:
+            generation_config = genai.GenerationConfig(
+                temperature=self._config.gemini_temperature,
+                max_output_tokens=self._config.gemini_max_output_tokens,
+                response_mime_type="application/json",
+            )
+            model = genai.GenerativeModel(
+                model_name=self._config.gemini_model,
+                system_instruction=system_instruction,
+                generation_config=generation_config,
+            )
+
+        review_resp = await self._generate_review(user_prompt, model=model)
+        return review_resp.summary, review_resp.issues
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
 
     def _build_client(self) -> genai.GenerativeModel:
-        """Initialise the Gemini client with the configured API key and model.
-
-        Returns:
-            Configured ``GenerativeModel`` instance.
-
-        Raises:
-            GeminiAuthError: When the API key is rejected during configuration.
-        """
+        """Initialise the Gemini client with the configured API key and model."""
         try:
             genai.configure(api_key=self._config.gemini_api_key)
             generation_config = genai.GenerationConfig(
@@ -229,35 +244,20 @@ class GeminiService:
                 f"Could not initialise Gemini client: {exc}"
             ) from exc
 
-    async def _generate_review(self, user_prompt: str) -> ReviewResponse:
-        """Send a single prompt to Gemini and parse the response.
-
-        Applies exponential back-off retry logic for transient failures
-        (rate-limit, timeout, server errors).
-
-        Args:
-            user_prompt: Fully assembled user-turn prompt string.
-
-        Returns:
-            Validated ``ReviewResponse``.
-
-        Raises:
-            GeminiAuthError      : Unauthenticated API call.
-            GeminiRateLimitError : Quota exhausted.
-            GeminiTimeoutError   : Deadline exceeded.
-            GeminiParseError     : Unparseable JSON response.
-            GeminiServiceError   : Any other irrecoverable error.
-        """
+    async def _generate_review(
+        self, user_prompt: str, model: Optional[genai.GenerativeModel] = None
+    ) -> ReviewResponse:
+        """Send a single prompt to Gemini and parse the response."""
         max_retries = self._config.review_max_retries
         base_delay = self._config.review_retry_delay
         last_error: Optional[Exception] = None
 
-        for attempt in range(1, max_retries + 2):  # +2 → 1 initial + N retries
+        for attempt in range(1, max_retries + 2):
             try:
                 logger.debug(
                     "Gemini API call — attempt %d/%d.", attempt, max_retries + 1
                 )
-                raw_text = await self._call_gemini(user_prompt)
+                raw_text = await self._call_gemini(user_prompt, model=model)
                 return self._parse_response(raw_text)
 
             except GeminiAuthError:
@@ -306,28 +306,16 @@ class GeminiService:
             "Gemini review failed after all retries for an unknown reason."
         )
 
-    async def _call_gemini(self, user_prompt: str) -> str:
-        """Execute the actual Gemini API call in a thread pool.
+    async def _call_gemini(
+        self, user_prompt: str, model: Optional[genai.GenerativeModel] = None
+    ) -> str:
+        """Execute the actual Gemini API call in a thread pool."""
+        target_model = model or self._client
 
-        The ``google-generativeai`` SDK is synchronous; we wrap it with
-        ``asyncio.to_thread`` so FastAPI's event loop is not blocked.
-
-        Args:
-            user_prompt: User-turn prompt string.
-
-        Returns:
-            Raw text content from the first Gemini response candidate.
-
-        Raises:
-            GeminiAuthError      : HTTP 401 from the API.
-            GeminiRateLimitError : HTTP 429 / quota exhausted.
-            GeminiTimeoutError   : HTTP 504 / deadline exceeded.
-            GeminiServiceError   : All other API errors.
-        """
         def _sync_call() -> str:
             start = time.monotonic()
             try:
-                response = self._client.generate_content(
+                response = target_model.generate_content(
                     contents=user_prompt,
                     request_options={"timeout": self._config.gemini_timeout_seconds},
                 )

@@ -23,7 +23,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         GeminiServiceError,
         GeminiTimeoutError,
     )
-    from app.github.github_client import GitHubAPIError, GitHubAuthError
+    from app.github import GitHubAPIError, GitHubAuthError
 
     @app.exception_handler(EmptyDiffError)
     async def empty_diff_handler(request: Request, exc: EmptyDiffError):
