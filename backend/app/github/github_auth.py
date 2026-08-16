@@ -21,8 +21,7 @@ from app.config import Settings, get_settings
 logger = logging.getLogger(__name__)
 
 
-class GitHubAuthError(Exception):
-    """Raised when GitHub authentication fails or credentials are missing."""
+from app.exceptions import GitHubAuthError
 
 
 class GitHubAuth(ABC):

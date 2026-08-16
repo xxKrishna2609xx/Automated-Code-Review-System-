@@ -61,28 +61,14 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-class GeminiServiceError(Exception):
-    """Base class for all errors raised by GeminiService."""
-
-
-class GeminiAuthError(GeminiServiceError):
-    """Raised when the API key is invalid or missing."""
-
-
-class GeminiRateLimitError(GeminiServiceError):
-    """Raised when the API quota is exhausted (HTTP 429)."""
-
-
-class GeminiTimeoutError(GeminiServiceError):
-    """Raised when an API call exceeds the configured timeout."""
-
-
-class GeminiParseError(GeminiServiceError):
-    """Raised when the model response cannot be parsed as ReviewResponse JSON."""
-
-
-class EmptyDiffError(GeminiServiceError):
-    """Raised when the supplied diff is empty after normalisation."""
+from app.exceptions import (
+    EmptyDiffError,
+    GeminiAuthError,
+    GeminiParseError,
+    GeminiRateLimitError,
+    GeminiServiceError,
+    GeminiTimeoutError,
+)
 
 
 
@@ -249,7 +235,6 @@ class GeminiService:
     ) -> ReviewResponse:
         """Send a single prompt to Gemini and parse the response."""
         max_retries = self._config.review_max_retries
-        base_delay = self._config.review_retry_delay
         last_error: Optional[Exception] = None
 
         for attempt in range(1, max_retries + 2):
@@ -260,51 +245,41 @@ class GeminiService:
                 raw_text = await self._call_gemini(user_prompt, model=model)
                 return self._parse_response(raw_text)
 
-            except GeminiAuthError:
-                # Non-retryable — bad key; raise immediately.
+            except (GeminiAuthError, GeminiParseError):
+                # Non-retryable — bad key or malformed response; surface immediately.
                 raise
 
-            except GeminiRateLimitError as exc:
+            except (GeminiRateLimitError, GeminiTimeoutError, GeminiServiceError) as exc:
                 last_error = exc
                 if attempt > max_retries:
                     break
-                delay = base_delay * (2 ** (attempt - 1))
-                logger.warning(
-                    "Rate limited by Gemini API (attempt %d/%d). "
-                    "Retrying in %.1fs.",
-                    attempt, max_retries + 1, delay,
-                )
-                await asyncio.sleep(delay)
-
-            except GeminiTimeoutError as exc:
-                last_error = exc
-                if attempt > max_retries:
-                    break
-                delay = base_delay * (2 ** (attempt - 1))
-                logger.warning(
-                    "Gemini API timeout (attempt %d/%d). Retrying in %.1fs.",
-                    attempt, max_retries + 1, delay,
-                )
-                await asyncio.sleep(delay)
-
-            except GeminiParseError:
-                # Non-retryable — malformed response; surface immediately.
-                raise
-
-            except GeminiServiceError as exc:
-                last_error = exc
-                if attempt > max_retries:
-                    break
-                delay = base_delay * (2 ** (attempt - 1))
-                logger.warning(
-                    "Gemini API error (attempt %d/%d): %s. Retrying in %.1fs.",
-                    attempt, max_retries + 1, exc, delay,
-                )
-                await asyncio.sleep(delay)
+                await self._handle_retry_backoff(attempt, max_retries, exc)
 
         raise last_error or GeminiServiceError(
             "Gemini review failed after all retries for an unknown reason."
         )
+
+    async def _handle_retry_backoff(
+        self, attempt: int, max_retries: int, exc: Exception
+    ) -> None:
+        """Calculate exponential backoff delay and sleep before retry."""
+        base_delay = self._config.review_retry_delay
+        delay = base_delay * (2 ** (attempt - 1))
+        logger.warning(
+            "Gemini API error (attempt %d/%d): %s. Retrying in %.1fs.",
+            attempt, max_retries + 1, exc, delay,
+        )
+        await asyncio.sleep(delay)
+
+    @staticmethod
+    def _validate_candidate(candidate: Any) -> None:
+        """Guard against candidate blocked by safety filters."""
+        if candidate.finish_reason and str(candidate.finish_reason) not in (
+            "1", "STOP"
+        ):
+            raise GeminiServiceError(
+                f"Gemini candidate was blocked — finish_reason={candidate.finish_reason}."
+            )
 
     async def _call_gemini(
         self, user_prompt: str, model: Optional[genai.GenerativeModel] = None
@@ -334,15 +309,7 @@ class GeminiService:
                     )
 
                 candidate = response.candidates[0]
-
-                # Guard: candidate was blocked by safety filters
-                if candidate.finish_reason and str(candidate.finish_reason) not in (
-                    "1", "STOP"
-                ):
-                    raise GeminiServiceError(
-                        f"Gemini candidate was blocked — finish_reason="
-                        f"{candidate.finish_reason}."
-                    )
+                self._validate_candidate(candidate)
 
                 raw = response.text
                 if not raw or not raw.strip():

@@ -20,9 +20,10 @@ import time
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from app.ai.gemini_service import EmptyDiffError, GeminiService, get_gemini_service
+from app.ai.gemini_service import GeminiService, get_gemini_service
+from app.exceptions import EmptyDiffError
 from app.models.agent_models import AgentCategory, AgentReview
-from app.models.review_models import Issue, ReviewRequest
+from app.models.review_models import Issue, IssueCategory, ReviewRequest
 from app.utils import detect_language_from_diff, normalise_diff
 
 logger = logging.getLogger(__name__)
@@ -162,3 +163,19 @@ class BaseAgent(ABC):
 
         language_hint = request.language_hint or detect_language_from_diff(diff)
         return diff, language_hint
+
+    async def _run_specialized_review(
+        self,
+        user_prompt: str,
+        system_prompt: str,
+        target_category: IssueCategory,
+    ) -> tuple[str, list[Issue]]:
+        """Helper for concrete agents to execute custom Gemini reviews and enforce issue category boundaries."""
+        summary, issues = await self._gemini.generate_custom_review(
+            user_prompt=user_prompt,
+            system_instruction=system_prompt,
+        )
+        for issue in issues:
+            issue.category = target_category
+        return summary, issues
+

@@ -47,16 +47,8 @@ class SecurityAgent(BaseAgent):
             pr_description=pr_description,
             language_hint=language_hint,
         )
-
-        summary, issues = await self._gemini.generate_custom_review(
+        return await self._run_specialized_review(
             user_prompt=user_prompt,
-            system_instruction=SECURITY_SYSTEM_PROMPT,
+            system_prompt=SECURITY_SYSTEM_PROMPT,
+            target_category=IssueCategory.SECURITY,
         )
-
-        # Force issue category to Security to maintain strict agent responsibility boundary
-        sec_issues: list[Issue] = []
-        for issue in issues:
-            issue.category = IssueCategory.SECURITY
-            sec_issues.append(issue)
-
-        return summary, sec_issues

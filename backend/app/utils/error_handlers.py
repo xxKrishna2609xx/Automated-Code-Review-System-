@@ -15,15 +15,16 @@ logger = logging.getLogger(__name__)
 
 def register_exception_handlers(app: FastAPI) -> None:
     """Register application-wide custom exception handlers on the FastAPI app instance."""
-    from app.ai.gemini_service import (
+    from app.exceptions import (
         EmptyDiffError,
         GeminiAuthError,
         GeminiParseError,
         GeminiRateLimitError,
         GeminiServiceError,
         GeminiTimeoutError,
+        GitHubAPIError,
+        GitHubAuthError,
     )
-    from app.github import GitHubAPIError, GitHubAuthError
 
     @app.exception_handler(EmptyDiffError)
     async def empty_diff_handler(request: Request, exc: EmptyDiffError):

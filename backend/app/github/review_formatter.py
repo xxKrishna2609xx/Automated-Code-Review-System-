@@ -65,8 +65,29 @@ class ReviewFormatter:
         event = self._determine_review_event(response.issues, response.summary)
 
         # 2. Build Inline Comments
+        inline_comments = self._build_inline_comments(response.issues, diff_text)
+
+        # 3. Build Summary Markdown
+        summary_md = self.format_summary_markdown(
+            response=response,
+            pr_number=pr_number,
+            files_reviewed_count=files_reviewed_count,
+            review_duration_seconds=review_duration_seconds,
+        )
+
+        return GitHubReviewPayload(
+            commit_id=commit_sha,
+            body=summary_md,
+            event=event,
+            comments=inline_comments,
+        )
+
+    def _build_inline_comments(
+        self, issues: list[Issue], diff_text: str
+    ) -> list[GitHubInlineComment]:
+        """Convert issues with line annotations into GitHub inline comments."""
         inline_comments: list[GitHubInlineComment] = []
-        for issue in response.issues:
+        for issue in issues:
             if not issue.line:
                 continue
 
@@ -83,21 +104,7 @@ class ReviewFormatter:
                     body=comment_body,
                 )
             )
-
-        # 3. Build Summary Markdown
-        summary_md = self.format_summary_markdown(
-            response=response,
-            pr_number=pr_number,
-            files_reviewed_count=files_reviewed_count,
-            review_duration_seconds=review_duration_seconds,
-        )
-
-        return GitHubReviewPayload(
-            commit_id=commit_sha,
-            body=summary_md,
-            event=event,
-            comments=inline_comments,
-        )
+        return inline_comments
 
     def format_inline_comment(self, issue: Issue) -> str:
         """Format a single Issue into a markdown inline comment body."""
@@ -120,6 +127,13 @@ class ReviewFormatter:
 
         return "\n".join(lines)
 
+    @staticmethod
+    def _compute_health_score(critical: int, high: int, medium: int, low: int) -> tuple[int, str]:
+        """Compute heuristic code health score and qualitative badge."""
+        score = max(0, 100 - (critical * 25 + high * 15 + medium * 5 + low * 2))
+        badge = "🟢 Excellent" if score >= 85 else ("🟡 Needs Attention" if score >= 65 else "🔴 Action Required")
+        return score, badge
+
     def format_summary_markdown(
         self,
         response: ReviewResponse,
@@ -134,9 +148,9 @@ class ReviewFormatter:
         low_count = sum(1 for i in response.issues if i.severity == Severity.LOW)
         total_issues = len(response.issues)
 
-        # Compute heuristic code health score (100 - weighted deductions)
-        score = max(0, 100 - (critical_count * 25 + high_count * 15 + medium_count * 5 + low_count * 2))
-        score_badge = "🟢 Excellent" if score >= 85 else ("🟡 Needs Attention" if score >= 65 else "🔴 Action Required")
+        score, score_badge = self._compute_health_score(
+            critical_count, high_count, medium_count, low_count
+        )
 
         lines = [
             f"# 🤖 AI Code Review Summary {f'(PR #{pr_number})' if pr_number else ''}",

@@ -48,16 +48,8 @@ class TestingAgent(BaseAgent):
             pr_description=pr_description,
             language_hint=language_hint,
         )
-
-        summary, issues = await self._gemini.generate_custom_review(
+        return await self._run_specialized_review(
             user_prompt=user_prompt,
-            system_instruction=TESTING_SYSTEM_PROMPT,
+            system_prompt=TESTING_SYSTEM_PROMPT,
+            target_category=IssueCategory.BEST_PRACTICE,
         )
-
-        # Force issue category to BEST_PRACTICE (testing gaps fall under best practices)
-        test_issues: list[Issue] = []
-        for issue in issues:
-            issue.category = IssueCategory.BEST_PRACTICE
-            test_issues.append(issue)
-
-        return summary, test_issues

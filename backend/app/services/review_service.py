@@ -250,8 +250,7 @@ class ReviewService:
 # ---------------------------------------------------------------------------
 
 
-class ReviewServiceError(Exception):
-    """Raised for orchestration-layer failures not covered by Gemini errors."""
+from app.exceptions import ReviewServiceError
 
 
 # ---------------------------------------------------------------------------

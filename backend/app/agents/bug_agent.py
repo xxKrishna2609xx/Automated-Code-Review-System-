@@ -47,16 +47,8 @@ class BugAgent(BaseAgent):
             pr_description=pr_description,
             language_hint=language_hint,
         )
-
-        summary, issues = await self._gemini.generate_custom_review(
+        return await self._run_specialized_review(
             user_prompt=user_prompt,
-            system_instruction=BUG_SYSTEM_PROMPT,
+            system_prompt=BUG_SYSTEM_PROMPT,
+            target_category=IssueCategory.BUG,
         )
-
-        # Force issue category to Bug to maintain strict agent responsibility boundary
-        bug_issues: list[Issue] = []
-        for issue in issues:
-            issue.category = IssueCategory.BUG
-            bug_issues.append(issue)
-
-        return summary, bug_issues

@@ -51,16 +51,8 @@ class DocumentationAgent(BaseAgent):
             pr_description=pr_description,
             language_hint=language_hint,
         )
-
-        summary, issues = await self._gemini.generate_custom_review(
+        return await self._run_specialized_review(
             user_prompt=user_prompt,
-            system_instruction=DOCUMENTATION_SYSTEM_PROMPT,
+            system_prompt=DOCUMENTATION_SYSTEM_PROMPT,
+            target_category=IssueCategory.BEST_PRACTICE,
         )
-
-        # Force issue category to BEST_PRACTICE (documentation issues fall under best practices)
-        doc_issues: list[Issue] = []
-        for issue in issues:
-            issue.category = IssueCategory.BEST_PRACTICE
-            doc_issues.append(issue)
-
-        return summary, doc_issues

@@ -35,25 +35,12 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-class GitHubAPIError(Exception):
-    """Base exception for GitHub REST API failures."""
-
-    def __init__(self, message: str, status_code: Optional[int] = None, response_body: Optional[str] = None) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-        self.response_body = response_body
-
-
-class GitHubNotFoundError(GitHubAPIError):
-    """Raised on HTTP 404 (PR or Repo not found)."""
-
-
-class GitHubRateLimitError(GitHubAPIError):
-    """Raised on HTTP 429 / 403 Rate Limit Exhaustion."""
-
-
-class GitHubValidationError(GitHubAPIError):
-    """Raised on HTTP 422 (Unprocessable Entity / stale diff position)."""
+from app.exceptions import (
+    GitHubAPIError,
+    GitHubNotFoundError,
+    GitHubRateLimitError,
+    GitHubValidationError,
+)
 
 
 # ---------------------------------------------------------------------------

@@ -140,6 +140,13 @@ class ReviewAggregator:
     # Private helpers
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _build_dedup_key(issue: Issue) -> tuple:
+        """Construct deterministic deduplication key (category, line, title_prefix_10_chars)."""
+        title_prefix = issue.title.lower()[:10].strip()
+        line_key = issue.line if issue.line is not None else -1
+        return (issue.category, line_key, title_prefix)
+
     def _deduplicate(self, issues: list[Issue]) -> list[Issue]:
         """Remove near-duplicate findings using deterministic signal matching.
 
@@ -154,10 +161,7 @@ class ReviewAggregator:
         seen: dict[tuple, Issue] = {}
 
         for issue in issues:
-            # Build a coarse dedup key
-            title_prefix = issue.title.lower()[:10].strip()
-            line_key = issue.line if issue.line is not None else -1
-            key = (issue.category, line_key, title_prefix)
+            key = self._build_dedup_key(issue)
 
             if key not in seen:
                 seen[key] = issue
