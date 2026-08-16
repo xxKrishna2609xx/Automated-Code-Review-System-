@@ -112,7 +112,20 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     # ── Routers ──────────────────────────────────────────────────────────
+    from app.api.analytics_router import router as analytics_router
+    from app.api.dashboard_router import router as dashboard_router
+    from app.api.history_router import router as history_router
+    from app.api.repository_router import router as repository_router
+
     app.include_router(review_router, prefix="/api/v1", tags=["Review"])
+    app.include_router(history_router, prefix="/api/v1", tags=["Review History"])
+    app.include_router(history_router, prefix="/api", tags=["Review History"])
+    app.include_router(dashboard_router, prefix="/api/v1", tags=["Dashboard"])
+    app.include_router(dashboard_router, prefix="/api", tags=["Dashboard"])
+    app.include_router(repository_router, prefix="/api/v1", tags=["Repositories"])
+    app.include_router(repository_router, prefix="/api", tags=["Repositories"])
+    app.include_router(analytics_router, prefix="/api/v1", tags=["Analytics"])
+    app.include_router(analytics_router, prefix="/api", tags=["Analytics"])
 
     # ── Health check ─────────────────────────────────────────────────────
     @app.get("/health", tags=["Health"])

@@ -142,4 +142,4 @@ def test_build_query_filtering():
     assert query["category_counts.security"] == {"$gt": 0}
     assert query["agent_results.agent_name"] == "security_agent"
     assert "$or" in query
-    assert len(query["$or"]) == 2
+    assert len(query["$or"]) == 3

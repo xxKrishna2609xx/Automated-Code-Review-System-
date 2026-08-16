@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   GitPullRequest,
+  GitBranch,
   BarChart3,
   Settings,
   Sparkles,
@@ -12,7 +13,8 @@ import { cn } from '@/lib/utils';
 
 const navItems = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { label: 'Pull Requests', href: '/pull-requests', icon: GitPullRequest, badge: 3 },
+  { label: 'Reviews', href: '/reviews', icon: GitPullRequest, badge: 3 },
+  { label: 'Repositories', href: '/repositories', icon: GitBranch },
   { label: 'Analytics', href: '/analytics', icon: BarChart3 },
   { label: 'Settings', href: '/settings', icon: Settings },
 ];

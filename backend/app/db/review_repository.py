@@ -197,12 +197,13 @@ class ReviewRepository:
             agent_key = filters.agent.strip().lower()
             query["agent_results.agent_name"] = agent_key
 
-        # Search term in pull_request_title or summary (regex escaped)
+        # Search term in pull_request_title, summary, or review_key (regex escaped)
         if filters.search and filters.search.strip():
             safe_term = re.escape(filters.search.strip())
             query["$or"] = [
                 {"pull_request_title": {"$regex": safe_term, "$options": "i"}},
                 {"summary": {"$regex": safe_term, "$options": "i"}},
+                {"review_key": {"$regex": safe_term, "$options": "i"}},
             ]
 
         return query
