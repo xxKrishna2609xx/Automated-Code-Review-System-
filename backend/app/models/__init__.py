@@ -1,7 +1,7 @@
 """
 app.models
 ==========
-Pydantic model exports for Review Engine, GitHub API, and Multi-Agent system.
+Pydantic model exports for Review Engine, GitHub API, Multi-Agent system, and Persistence.
 """
 
 from app.models.agent_models import AgentCategory, AgentReview, FinalReview
@@ -12,6 +12,11 @@ from app.models.github_models import (
     GitHubPullRequest,
     GitHubReviewEvent,
     GitHubReviewPayload,
+)
+from app.models.persistence_models import (
+    PersistedReview,
+    ReviewStatus,
+    generate_review_key,
 )
 from app.models.review_models import (
     Issue,
@@ -36,4 +41,7 @@ __all__ = [
     "AgentCategory",
     "AgentReview",
     "FinalReview",
+    "PersistedReview",
+    "ReviewStatus",
+    "generate_review_key",
 ]

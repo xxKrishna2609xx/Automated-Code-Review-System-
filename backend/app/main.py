@@ -49,13 +49,22 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manage application startup and graceful shutdown."""
+    from app.db.mongodb import close_mongo_connection, connect_to_mongo
+
     logger.info(
         "AI Code Review Bot starting — environment=%s model=%s",
         settings.environment,
         settings.gemini_model,
     )
+    try:
+        await connect_to_mongo()
+    except Exception as exc:
+        logger.warning("MongoDB initial connection deferred or failed: %s", exc)
+
     yield
+
     logger.info("AI Code Review Bot shutting down.")
+    close_mongo_connection()
 
 
 # ---------------------------------------------------------------------------

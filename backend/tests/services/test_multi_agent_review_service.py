@@ -1,17 +1,14 @@
 """
 test_multi_agent_review_service.py
 ===================================
-Unit tests for Stage 6.13 MultiAgentReviewService.
+Unit tests for MultiAgentReviewService (Phase 6 & Phase 7 Integration).
 
 Tests cover:
 - End-to-end multi-agent pipeline execution (Orchestrator → Aggregator → ScoreEngine → Adapter).
 - ``review_raw()`` returns a scored native ``FinalReview``.
 - ``review()`` returns a Phase 5-compatible ``ReviewResponse``.
 - ``review_full()`` returns both ``FinalReview`` and ``ReviewResponse``.
-- Diff pre-processing (whitespace stripping, Windows line ending normalisation, language detection).
-- Empty diff validation raises ``EmptyDiffError``.
-- Graceful handling when individual agents fail.
-- Audit logging verification.
+- Stage 7.5: ``review_and_persist()`` success, failure handling, duplicate execution, and partial failure.
 """
 
 from __future__ import annotations
@@ -22,8 +19,10 @@ import pytest
 
 from app.ai.gemini_service import EmptyDiffError
 from app.models.agent_models import AgentCategory, AgentReview, FinalReview
+from app.models.persistence_models import ReviewStatus
 from app.models.review_models import Issue, IssueCategory, ReviewRequest, ReviewResponse, Severity
 from app.services.multi_agent_review_service import MultiAgentReviewService
+from app.services.review_persistence_service import ReviewPersistenceError
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +87,7 @@ def mock_orchestrator():
 
 
 # ---------------------------------------------------------------------------
-# Tests
+# Phase 6 Core Tests
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -139,7 +138,6 @@ async def test_multi_agent_review_service_full(mock_orchestrator):
 async def test_multi_agent_review_service_empty_diff():
     """Diff becoming empty after normalisation raises EmptyDiffError."""
     service = MultiAgentReviewService()
-    # ReviewRequest accepts non-empty string, but normalise_diff renders empty
     request = ReviewRequest(diff="   dummy   ")
 
     with patch("app.services.multi_agent_review_service.normalise_diff", return_value="   "):
@@ -176,3 +174,121 @@ async def test_multi_agent_review_service_agent_failure_resilience():
     assert final_review.total_issues == 1
     assert "security_agent" in final_review.failed_agents
     assert len(final_review.successful_agents) == 4
+
+
+# ---------------------------------------------------------------------------
+# Stage 7.5 Integration Tests (Phase 6 + Persistence)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_review_and_persist_success(mock_orchestrator):
+    """review_and_persist executes review and persists doc successfully."""
+    mock_persist_svc = MagicMock()
+    mock_persist_svc.save_final_review = AsyncMock(
+        side_effect=lambda final_review, **kwargs: MagicMock(
+            review_key=f"{kwargs['owner']}/{kwargs['repo_name']}#{kwargs['pull_request_number']}@{kwargs.get('commit_sha') or 'head'}",
+            review_status=ReviewStatus.COMPLETED,
+        )
+    )
+
+    service = MultiAgentReviewService(
+        orchestrator=mock_orchestrator,
+        persistence_service=mock_persist_svc,
+    )
+    request = ReviewRequest(diff=VALID_DIFF, pr_title="PR title")
+
+    final_review, persisted = await service.review_and_persist(
+        request=request,
+        owner="myorg",
+        repo_name="myrepo",
+        pull_request_number=10,
+        commit_sha="c1c2c3",
+        author="alice",
+    )
+
+    assert final_review.total_issues == 2
+    assert persisted.review_key == "myorg/myrepo#10@c1c2c3"
+    assert mock_persist_svc.save_final_review.called
+
+
+@pytest.mark.asyncio
+async def test_review_and_persist_failure_handling(mock_orchestrator):
+    """When persistence fails, ReviewPersistenceError is raised (never silently masked)."""
+    mock_persist_svc = MagicMock()
+    mock_persist_svc.save_final_review = AsyncMock(side_effect=RuntimeError("MongoDB write error"))
+
+    service = MultiAgentReviewService(
+        orchestrator=mock_orchestrator,
+        persistence_service=mock_persist_svc,
+    )
+    request = ReviewRequest(diff=VALID_DIFF)
+
+    with pytest.raises(ReviewPersistenceError, match="Review persistence failed"):
+        await service.review_and_persist(
+            request=request,
+            owner="myorg",
+            repo_name="myrepo",
+            pull_request_number=10,
+        )
+
+
+@pytest.mark.asyncio
+async def test_review_and_persist_duplicate_execution(mock_orchestrator):
+    """Duplicate review_and_persist calls for same PR commit use identical review_key."""
+    mock_persist_svc = MagicMock()
+    saved_keys = []
+
+    async def _mock_save(final_review, **kwargs):
+        key = f"{kwargs['owner']}/{kwargs['repo_name']}#{kwargs['pull_request_number']}@{kwargs['commit_sha']}"
+        saved_keys.append(key)
+        return MagicMock(review_key=key)
+
+    mock_persist_svc.save_final_review = AsyncMock(side_effect=_mock_save)
+
+    service = MultiAgentReviewService(
+        orchestrator=mock_orchestrator,
+        persistence_service=mock_persist_svc,
+    )
+    request = ReviewRequest(diff=VALID_DIFF)
+
+    _, p1 = await service.review_and_persist(
+        request=request, owner="org", repo_name="repo", pull_request_number=5, commit_sha="abc1234"
+    )
+    _, p2 = await service.review_and_persist(
+        request=request, owner="org", repo_name="repo", pull_request_number=5, commit_sha="abc1234"
+    )
+
+    assert p1.review_key == p2.review_key == "org/repo#5@abc1234"
+    assert len(saved_keys) == 2
+
+
+@pytest.mark.asyncio
+async def test_review_and_persist_partial_agent_failure():
+    """Partial agent failure persists review with PARTIAL status."""
+    mock_orch = MagicMock()
+    reviews = [
+        _make_agent_review("bug_agent", AgentCategory.BUG, issues=[], success=True),
+        _make_agent_review("security_agent", AgentCategory.SECURITY, issues=[], success=False),
+    ]
+    mock_orch.run = AsyncMock(return_value=reviews)
+
+    mock_persist_svc = MagicMock()
+
+    async def _mock_save(final_review, **kwargs):
+        status = ReviewStatus.PARTIAL if final_review.failed_agents else ReviewStatus.COMPLETED
+        return MagicMock(review_status=status)
+
+    mock_persist_svc.save_final_review = AsyncMock(side_effect=_mock_save)
+
+    service = MultiAgentReviewService(
+        orchestrator=mock_orch,
+        persistence_service=mock_persist_svc,
+    )
+    request = ReviewRequest(diff=VALID_DIFF)
+
+    final_review, persisted = await service.review_and_persist(
+        request=request, owner="org", repo_name="repo", pull_request_number=1
+    )
+
+    assert "security_agent" in final_review.failed_agents
+    assert persisted.review_status == ReviewStatus.PARTIAL

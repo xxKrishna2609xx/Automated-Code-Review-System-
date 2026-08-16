@@ -142,6 +142,16 @@ class Settings(BaseSettings):
         description="HTTP request timeout for GitHub API calls (seconds).",
     )
 
+    # ── MongoDB Integration (Phase 7) ───────────────────────────────────
+    mongodb_uri: str = Field(
+        default="mongodb://localhost:27017",
+        description="MongoDB connection string (URI).",
+    )
+    mongodb_database: str = Field(
+        default="code_review_db",
+        description="MongoDB database name for storing reviews and analytics.",
+    )
+
     # ── Pydantic settings config ─────────────────────────────────────────
     model_config = SettingsConfigDict(
         env_file=".env",

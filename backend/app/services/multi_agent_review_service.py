@@ -1,7 +1,8 @@
 """
 multi_agent_review_service.py
 ==============================
-High-level service orchestrator for the Phase 6 Multi-Agent AI Code Review System.
+High-level service orchestrator for the Phase 6 Multi-Agent AI Code Review System
+with Phase 7 MongoDB Persistence integration.
 
 Pipeline Flow:
 --------------
@@ -15,11 +16,13 @@ ReviewRequest
     ↓
 4. ScoreEngine (calculates overall quality score 0–100 -> FinalReview)
     ↓
-5. Phase5Adapter (transforms FinalReview -> ReviewResponse for Phase 5 compatibility)
+5. ReviewPersistenceService (Phase 7: persists FinalReview -> PersistedReview in MongoDB)
     ↓
-Structured Audit Logging & Return (both FinalReview and ReviewResponse available)
+6. Phase5Adapter (transforms FinalReview -> ReviewResponse for Phase 5 compatibility)
+    ↓
+Structured Audit Logging & Return
 
-Author : AI Code Review Bot — Phase 6 (Stage 6.13)
+Author : AI Code Review Bot — Phase 7 (Stage 7.5)
 """
 
 from __future__ import annotations
@@ -31,21 +34,22 @@ from typing import Optional, Tuple
 from app.aggregator.review_aggregator import ReviewAggregator
 from app.ai.gemini_service import EmptyDiffError, GeminiService, get_gemini_service
 from app.models.agent_models import AgentReview, FinalReview
+from app.models.persistence_models import PersistedReview
 from app.models.review_models import ReviewRequest, ReviewResponse
 from app.orchestrator.review_orchestrator import ReviewOrchestrator
 from app.scoring.score_engine import ScoreEngine, ScoringWeights
 from app.services.phase5_adapter import Phase5Adapter
+from app.services.review_persistence_service import (
+    ReviewPersistenceError,
+    ReviewPersistenceService,
+)
 from app.utils import detect_language_from_diff, normalise_diff
 
 logger = logging.getLogger(__name__)
 
 
 class MultiAgentReviewService:
-    """Orchestrates the complete end-to-end Multi-Agent AI Code Review pipeline.
-
-    Connects Orchestrator → Aggregator → ScoreEngine → Phase5Adapter into a single
-    callable service.
-    """
+    """Orchestrates the complete end-to-end Multi-Agent AI Code Review pipeline."""
 
     def __init__(
         self,
@@ -54,14 +58,16 @@ class MultiAgentReviewService:
         aggregator: Optional[ReviewAggregator] = None,
         score_engine: Optional[ScoreEngine] = None,
         adapter: Optional[Phase5Adapter] = None,
+        persistence_service: Optional[ReviewPersistenceService] = None,
     ) -> None:
         self._gemini = gemini_service or get_gemini_service()
         self._orchestrator = orchestrator or ReviewOrchestrator(gemini_service=self._gemini)
         self._aggregator = aggregator or ReviewAggregator()
         self._score_engine = score_engine or ScoreEngine()
         self._adapter = adapter or Phase5Adapter()
+        self._persistence_service = persistence_service or ReviewPersistenceService()
 
-        logger.info("MultiAgentReviewService initialized.")
+        logger.info("MultiAgentReviewService initialized with Phase 7 persistence.")
 
     async def review_raw(self, request: ReviewRequest) -> FinalReview:
         """Execute multi-agent review pipeline and return native Phase 6 ``FinalReview``.
@@ -97,26 +103,62 @@ class MultiAgentReviewService:
 
         return final_scored
 
-    async def review(self, request: ReviewRequest) -> ReviewResponse:
-        """Execute multi-agent review pipeline and return Phase 5-compatible ``ReviewResponse``.
+    async def review_and_persist(
+        self,
+        request: ReviewRequest,
+        owner: str,
+        repo_name: str,
+        pull_request_number: int,
+        commit_sha: Optional[str] = None,
+        author: str = "unknown",
+        pull_request_title: Optional[str] = None,
+        pull_request_url: Optional[str] = None,
+        base_branch: Optional[str] = None,
+        head_branch: Optional[str] = None,
+        files_changed: int = 1,
+        additions: int = 0,
+        deletions: int = 0,
+    ) -> tuple[FinalReview, PersistedReview]:
+        """Execute multi-agent review AND persist result into MongoDB (Phase 7).
 
-        This method acts as a drop-in replacement for Phase 5's ``ReviewService.review()``.
-
-        Args:
-            request: Incoming validated ``ReviewRequest``.
+        Order of operations:
+        1. Run multi-agent review pipeline -> FinalReview.
+        2. Persist FinalReview into MongoDB -> PersistedReview.
+        3. If persistence fails, raise ReviewPersistenceError (never mask failure).
 
         Returns:
-            Phase 5-compatible ``ReviewResponse`` suitable for existing publishers.
+            Tuple of (FinalReview, PersistedReview).
         """
         final_review = await self.review_raw(request)
-        # ── Step 5: Adapt to Phase 5 ────────────────────────────────────
+
+        try:
+            persisted = await self._persistence_service.save_final_review(
+                final_review=final_review,
+                owner=owner,
+                repo_name=repo_name,
+                pull_request_number=pull_request_number,
+                commit_sha=commit_sha,
+                author=author,
+                pull_request_title=pull_request_title or request.pr_title,
+                pull_request_url=pull_request_url,
+                base_branch=base_branch,
+                head_branch=head_branch,
+                files_changed=files_changed,
+                additions=additions,
+                deletions=deletions,
+            )
+            return final_review, persisted
+        except Exception as exc:
+            logger.error("Failed to persist review for %s/%s#%d: %s", owner, repo_name, pull_request_number, exc)
+            raise ReviewPersistenceError(f"Review persistence failed: {exc}") from exc
+
+    async def review(self, request: ReviewRequest) -> ReviewResponse:
+        """Execute multi-agent review pipeline and return Phase 5-compatible ``ReviewResponse``."""
+        final_review = await self.review_raw(request)
         return self._adapter.adapt(final_review)
 
     async def review_full(self, request: ReviewRequest) -> Tuple[FinalReview, ReviewResponse]:
-        """Execute pipeline and return BOTH native ``FinalReview`` and adapted ``ReviewResponse``.
-
-        Useful for callers that need both full Phase 6 analytics and Phase 5 compatibility.
-        """
+        """Execute pipeline and return BOTH native ``FinalReview`` and adapted ``ReviewResponse``."""
         final_review = await self.review_raw(request)
         review_response = self._adapter.adapt(final_review)
         return final_review, review_response
