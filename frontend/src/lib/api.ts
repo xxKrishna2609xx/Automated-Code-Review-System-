@@ -11,6 +11,8 @@
  * - fetchRepositoryAnalytics
  * - fetchSecurityAnalytics
  * - fetchAgentAnalytics
+ *
+ * Includes offline/empty mock fallback support (Stage 7.20).
  */
 
 export interface PersistedReview {
@@ -139,6 +141,58 @@ export interface ReviewFilterParams {
 const API_BASE_URL =
   (import.meta as any).env?.VITE_API_BASE_URL || '/api/v1';
 
+// ── Mock Datasets for Stage 7.20 Fallbacks ────────────────
+const MOCK_REVIEWS: PersistedReview[] = [
+  {
+    id: 'mock-rev-1',
+    review_key: 'acme/backend-service#142',
+    repository: 'acme/backend-service',
+    owner: 'acme',
+    repo_name: 'backend-service',
+    pull_request_number: 142,
+    pull_request_title: 'feat: Add OAuth2 authentication & session validation',
+    author: 'krishna26',
+    overall_score: 68,
+    total_issues: 3,
+    severity_counts: { critical: 1, high: 1, medium: 1, low: 0 },
+    category_counts: { security: 2, error_handling: 1 },
+    agent_counts: { security_agent: 1, bug_agent: 1, performance_agent: 1, documentation_agent: 1, testing_agent: 1 },
+    summary: 'OAuth2 feature implementation flagged 2 critical security concerns (hardcoded secret and missing CSRF validation).',
+    issues: [
+      { title: 'Hardcoded OAuth2 Client Secret', severity: 'Critical', category: 'Security', description: 'The OAuth client secret is hardcoded.', suggestion: 'Use GOOGLE_CLIENT_SECRET environment variable.', file: 'app/auth/google.py', line: 12 },
+      { title: 'Missing Error Handling in Token Exchange', severity: 'High', category: 'Error Handling', description: 'HTTP post response status is unverified.', suggestion: 'Add response.raise_for_status().', file: 'app/auth/google.py', line: 28 },
+      { title: 'CSRF State Parameter Not Verified', severity: 'Medium', category: 'Security', description: 'State parameter is unverified in callback.', suggestion: 'Validate session state.', file: 'app/api/auth.py', line: 45 },
+    ],
+    review_duration_ms: 1850,
+    review_status: 'COMPLETED',
+    created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+  },
+  {
+    id: 'mock-rev-2',
+    review_key: 'acme/frontend-app#89',
+    repository: 'acme/frontend-app',
+    owner: 'acme',
+    repo_name: 'frontend-app',
+    pull_request_number: 89,
+    pull_request_title: 'perf: Implement virtualized table rendering',
+    author: 'alex_dev',
+    overall_score: 92,
+    total_issues: 1,
+    severity_counts: { critical: 0, high: 0, medium: 1, low: 0 },
+    category_counts: { performance: 1 },
+    agent_counts: { security_agent: 1, bug_agent: 1, performance_agent: 1, documentation_agent: 1, testing_agent: 1 },
+    summary: 'Solid performance improvement with virtualized scrolling.',
+    issues: [
+      { title: 'Unnecessary Re-render in Table Row', severity: 'Medium', category: 'Performance', description: 'Row component lacks React.memo memoization.', suggestion: 'Wrap row component in React.memo().', file: 'src/components/Table.tsx', line: 64 },
+    ],
+    review_duration_ms: 1240,
+    review_status: 'COMPLETED',
+    created_at: new Date(Date.now() - 3600000 * 18).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 18).toISOString(),
+  },
+];
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorText = await response.text().catch(() => 'Unknown API Error');
@@ -164,8 +218,29 @@ function buildQueryString(params?: Record<string, any>): string {
  */
 export async function fetchOverviewMetrics(repository?: string): Promise<DashboardOverviewResponse> {
   const qs = buildQueryString({ repository });
-  const res = await fetch(`${API_BASE_URL}/dashboard/overview${qs}`);
-  return handleResponse<DashboardOverviewResponse>(res);
+  try {
+    const res = await fetch(`${API_BASE_URL}/dashboard/overview${qs}`);
+    return await handleResponse<DashboardOverviewResponse>(res);
+  } catch (err) {
+    console.warn('API fetchOverviewMetrics failed, returning fallback mock overview:', err);
+    return {
+      total_prs_reviewed: 2,
+      total_issues: 4,
+      average_score: 80.0,
+      security_issues: 2,
+      severity_distribution: { critical: 1, high: 1, medium: 2, low: 0 },
+      category_distribution: { security: 2, performance: 1, error_handling: 1 },
+      reviews_last_7_days: 2,
+      reviews_last_30_days: 2,
+      average_review_duration_ms: 1545.0,
+      recent_reviews: MOCK_REVIEWS,
+      score_trend: [
+        { date: 'Aug 10', average_score: 75.0, review_count: 1 },
+        { date: 'Aug 12', average_score: 82.0, review_count: 1 },
+        { date: 'Aug 16', average_score: 80.0, review_count: 2 },
+      ],
+    };
+  }
 }
 
 /**
@@ -173,16 +248,34 @@ export async function fetchOverviewMetrics(repository?: string): Promise<Dashboa
  */
 export async function fetchReviews(filters?: ReviewFilterParams): Promise<PaginatedReviewsResponse> {
   const qs = buildQueryString(filters);
-  const res = await fetch(`${API_BASE_URL}/reviews${qs}`);
-  return handleResponse<PaginatedReviewsResponse>(res);
+  try {
+    const res = await fetch(`${API_BASE_URL}/reviews${qs}`);
+    return await handleResponse<PaginatedReviewsResponse>(res);
+  } catch (err) {
+    console.warn('API fetchReviews failed, returning fallback mock reviews:', err);
+    return {
+      items: MOCK_REVIEWS,
+      page: 1,
+      page_size: 20,
+      total: MOCK_REVIEWS.length,
+      total_pages: 1,
+    };
+  }
 }
 
 /**
  * Fetch detailed review document by ID or review_key.
  */
 export async function fetchReviewById(id: string): Promise<PersistedReview> {
-  const res = await fetch(`${API_BASE_URL}/reviews/${encodeURIComponent(id)}`);
-  return handleResponse<PersistedReview>(res);
+  try {
+    const res = await fetch(`${API_BASE_URL}/reviews/${encodeURIComponent(id)}`);
+    return await handleResponse<PersistedReview>(res);
+  } catch (err) {
+    console.warn(`API fetchReviewById(${id}) failed, searching mock dataset:`, err);
+    const found = MOCK_REVIEWS.find((r) => r.id === id || r.review_key === id);
+    if (found) return found;
+    return MOCK_REVIEWS[0];
+  }
 }
 
 /**
@@ -194,16 +287,72 @@ export async function fetchRepositories(
   search?: string
 ): Promise<PaginatedRepositoriesResponse> {
   const qs = buildQueryString({ page, page_size: pageSize, search });
-  const res = await fetch(`${API_BASE_URL}/repositories${qs}`);
-  return handleResponse<PaginatedRepositoriesResponse>(res);
+  try {
+    const res = await fetch(`${API_BASE_URL}/repositories${qs}`);
+    return await handleResponse<PaginatedRepositoriesResponse>(res);
+  } catch (err) {
+    console.warn('API fetchRepositories failed, returning fallback mock repositories:', err);
+    return {
+      items: [
+        {
+          repository_id: 'acme/backend-service',
+          owner: 'acme',
+          repo_name: 'backend-service',
+          health_score: 88.5,
+          average_score: 82.0,
+          pr_count: 14,
+          issue_count: 6,
+          last_reviewed_at: new Date().toISOString(),
+        },
+        {
+          repository_id: 'acme/frontend-app',
+          owner: 'acme',
+          repo_name: 'frontend-app',
+          health_score: 94.0,
+          average_score: 92.0,
+          pr_count: 22,
+          issue_count: 3,
+          last_reviewed_at: new Date().toISOString(),
+        },
+      ],
+      page: 1,
+      page_size: 20,
+      total: 2,
+      total_pages: 1,
+    };
+  }
 }
 
 /**
  * Fetch detailed analytics for a single repository by ID ('owner/repo').
  */
 export async function fetchRepositoryAnalytics(id: string): Promise<RepositoryAnalyticsResponse> {
-  const res = await fetch(`${API_BASE_URL}/repositories/${encodeURIComponent(id)}/analytics`);
-  return handleResponse<RepositoryAnalyticsResponse>(res);
+  try {
+    const res = await fetch(`${API_BASE_URL}/repositories/${encodeURIComponent(id)}/analytics`);
+    return await handleResponse<RepositoryAnalyticsResponse>(res);
+  } catch (err) {
+    console.warn(`API fetchRepositoryAnalytics(${id}) failed, returning fallback mock analytics:`, err);
+    return {
+      repository_id: decodeURIComponent(id),
+      owner: id.split('/')[0] || 'acme',
+      repo_name: id.split('/')[1] || id,
+      health_score: 91.0,
+      average_score: 87.5,
+      pr_count: 12,
+      issue_count: 4,
+      security_issues: 1,
+      bug_issues: 2,
+      performance_issues: 1,
+      testing_issues: 0,
+      documentation_issues: 0,
+      severity_distribution: { critical: 0, high: 1, medium: 2, low: 1 },
+      category_distribution: { security: 1, bug: 2, performance: 1 },
+      score_trend: [
+        { date: 'Aug 10', average_score: 85.0, review_count: 2 },
+        { date: 'Aug 16', average_score: 90.0, review_count: 3 },
+      ],
+    };
+  }
 }
 
 /**
@@ -211,14 +360,63 @@ export async function fetchRepositoryAnalytics(id: string): Promise<RepositoryAn
  */
 export async function fetchSecurityAnalytics(repository?: string): Promise<SecurityAnalyticsResponse> {
   const qs = buildQueryString({ repository });
-  const res = await fetch(`${API_BASE_URL}/analytics/security${qs}`);
-  return handleResponse<SecurityAnalyticsResponse>(res);
+  try {
+    const res = await fetch(`${API_BASE_URL}/analytics/security${qs}`);
+    return await handleResponse<SecurityAnalyticsResponse>(res);
+  } catch (err) {
+    console.warn('API fetchSecurityAnalytics failed, returning fallback mock security data:', err);
+    return {
+      total_security_issues: 3,
+      critical_security_issues: 1,
+      high_security_issues: 2,
+      security_trend: [
+        { date: 'Aug 12', security_issue_count: 1 },
+        { date: 'Aug 14', security_issue_count: 2 },
+      ],
+      top_vulnerable_repositories: [
+        { repository_id: 'acme/backend-service', security_issue_count: 3 },
+      ],
+      common_security_types: [
+        { title: 'Hardcoded OAuth Client Secret', count: 1 },
+        { title: 'Unvalidated Redirect Callback', count: 1 },
+        { title: 'Missing CSRF State Verification', count: 1 },
+      ],
+    };
+  }
 }
 
 /**
  * Fetch multi-agent distribution, success rates, and duration analytics.
  */
 export async function fetchAgentAnalytics(): Promise<AgentAnalyticsResponse> {
-  const res = await fetch(`${API_BASE_URL}/analytics/agents`);
-  return handleResponse<AgentAnalyticsResponse>(res);
+  try {
+    const res = await fetch(`${API_BASE_URL}/analytics/agents`);
+    return await handleResponse<AgentAnalyticsResponse>(res);
+  } catch (err) {
+    console.warn('API fetchAgentAnalytics failed, returning fallback mock agent data:', err);
+    return {
+      total_agent_executions: 10,
+      agent_distribution: {
+        security_agent: 2,
+        bug_agent: 2,
+        performance_agent: 2,
+        documentation_agent: 2,
+        testing_agent: 2,
+      },
+      agent_success_rates: {
+        security_agent: 100,
+        bug_agent: 100,
+        performance_agent: 100,
+        documentation_agent: 100,
+        testing_agent: 100,
+      },
+      agent_average_durations_ms: {
+        security_agent: 340,
+        bug_agent: 290,
+        performance_agent: 310,
+        documentation_agent: 250,
+        testing_agent: 280,
+      },
+    };
+  }
 }

@@ -20,7 +20,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from app.db.review_repository import ReviewFilter, ReviewRepository
+from app.db.review_repository import ReviewFilter, ReviewRepository, get_review_repository
 from app.models.persistence_models import PersistedReview
 
 router = APIRouter()

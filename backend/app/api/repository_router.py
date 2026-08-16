@@ -22,15 +22,10 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from app.api.dashboard_router import ScoreTrendPoint
-from app.db.review_repository import ReviewFilter, ReviewRepository
+from app.db.review_repository import ReviewFilter, ReviewRepository, get_review_repository
 from app.services.analytics_service import AnalyticsService, calculate_health_score, get_analytics_service
 
 router = APIRouter()
-
-
-def get_review_repository() -> ReviewRepository:
-    """Dependency factory for ReviewRepository."""
-    return ReviewRepository()
 
 
 # ---------------------------------------------------------------------------

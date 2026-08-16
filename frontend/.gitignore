@@ -1,41 +1,34 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Vite + React + TypeScript project
 
 # dependencies
 /node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
-# testing
-/coverage
+# build output
+/dist
 
-# next.js
-/.next/
-/out/
+# TypeScript build cache
+*.tsbuildinfo
 
-# production
-/build
+# environment variables
+.env
+.env.local
+.env.*.local
 
-# misc
+# editor / OS
 .DS_Store
 *.pem
+.vscode/settings.json
 
-# debug
+# debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# test coverage
+/coverage
 
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
+# misc Next.js artifacts (in case of accidental runs)
+/.next/
+/out/
 next-env.d.ts

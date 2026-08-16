@@ -320,4 +320,5 @@ class AnalyticsService:
 
 def get_analytics_service() -> AnalyticsService:
     """FastAPI dependency provider for AnalyticsService."""
-    return AnalyticsService()
+    from app.db.review_repository import get_review_repository
+    return AnalyticsService(repository=get_review_repository())

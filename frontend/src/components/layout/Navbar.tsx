@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Search, Bell, Sparkles } from 'lucide-react';
+import { Search, Bell } from 'lucide-react';
 import CommandPalette from '../CommandPalette';
 
 interface NavbarProps {
   title?: string;
+  rightElement?: React.ReactNode;
 }
 
-export default function Navbar({ title = 'Dashboard' }: NavbarProps) {
+export default function Navbar({ title = 'Dashboard', rightElement }: NavbarProps) {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
@@ -20,6 +21,8 @@ export default function Navbar({ title = 'Dashboard' }: NavbarProps) {
 
         {/* Right tools */}
         <div className="flex items-center gap-3">
+          {rightElement}
+
           {/* Command Palette Trigger */}
           <button
             onClick={() => setCommandPaletteOpen(true)}

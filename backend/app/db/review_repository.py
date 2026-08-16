@@ -221,3 +221,8 @@ class ReviewRepository:
         field = filters.sort_by if filters.sort_by in allowed_fields else "created_at"
         direction = -1 if filters.sort_order.lower() == "desc" else 1
         return field, direction
+
+
+def get_review_repository() -> ReviewRepository:
+    """Dependency provider returning an initialized ReviewRepository instance."""
+    return ReviewRepository()
