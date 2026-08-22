@@ -1,7 +1,9 @@
 import React from 'react';
 import { AlertCircle, FileCode, CornerDownRight, Lightbulb } from 'lucide-react';
+import { FixActionButton } from '../fixes/FixActionButton';
 
 interface Issue {
+  id?: string;
   title: string;
   severity: string;
   category: string;
@@ -14,9 +16,10 @@ interface Issue {
 interface Props {
   issue: Issue;
   index: number;
+  reviewId?: string;
 }
 
-export default function IssueCard({ issue, index }: Props) {
+export default function IssueCard({ issue, index, reviewId }: Props) {
   const sev = issue.severity.toLowerCase();
 
   const sevBadge =
@@ -27,6 +30,8 @@ export default function IssueCard({ issue, index }: Props) {
       : sev === 'medium'
       ? 'text-blue-400 bg-blue-500/10 border-blue-500/20'
       : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+
+  const issueId = issue.id || `${issue.category.toLowerCase()}-${index}`;
 
   return (
     <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 space-y-3 hover:border-zinc-700 transition-colors">
@@ -48,6 +53,10 @@ export default function IssueCard({ issue, index }: Props) {
           </div>
           <h4 className="text-sm font-semibold text-white">{issue.title}</h4>
         </div>
+
+        {reviewId && (
+          <FixActionButton reviewId={reviewId} issueId={issueId} />
+        )}
       </div>
 
       <p className="text-xs text-zinc-300 leading-relaxed">{issue.description}</p>

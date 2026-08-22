@@ -3,6 +3,7 @@ import IssueCard from './IssueCard';
 import { CheckCircle } from 'lucide-react';
 
 interface Issue {
+  id?: string;
   title: string;
   severity: string;
   category: string;
@@ -14,9 +15,10 @@ interface Issue {
 
 interface Props {
   issues: Issue[];
+  reviewId?: string;
 }
 
-export default function IssueList({ issues }: Props) {
+export default function IssueList({ issues, reviewId }: Props) {
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
@@ -80,7 +82,7 @@ export default function IssueList({ issues }: Props) {
       ) : (
         <div className="space-y-3">
           {filtered.map((issue, idx) => (
-            <IssueCard key={idx} issue={issue} index={idx} />
+            <IssueCard key={idx} issue={issue} index={idx} reviewId={reviewId} />
           ))}
         </div>
       )}
