@@ -104,6 +104,7 @@ class FixPreviewResponse(BaseModel):
 _FIX_REQUEST_STORE: Dict[str, FixRequest] = {}
 _FIX_PATCH_STORE: Dict[str, FixPatch] = {}
 _FIX_VAL_STORE: Dict[str, PatchValidationResult] = {}
+_FIX_RESULT_STORE: Dict[str, Any] = {}
 
 
 def reset_fix_stores() -> None:
@@ -111,6 +112,8 @@ def reset_fix_stores() -> None:
     _FIX_REQUEST_STORE.clear()
     _FIX_PATCH_STORE.clear()
     _FIX_VAL_STORE.clear()
+    _FIX_RESULT_STORE.clear()
+
 
 
 # ---------------------------------------------------------------------------

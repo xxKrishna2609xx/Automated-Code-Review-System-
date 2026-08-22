@@ -1,4 +1,4 @@
-﻿"""
+"""
 fixes_router.py  (app.api)
 ==========================
 FastAPI router for Phase 8 Fix & Auto-Remediation endpoints.
@@ -147,6 +147,29 @@ async def create_fix_request(
 
 
 @router.get(
+    "/fixes/analytics",
+    summary="Get aggregated fix analytics metrics",
+    tags=["Fixes"],
+)
+async def get_fix_analytics(
+    repository: Optional[str] = None,
+) -> dict:
+    """Fetch operational and effectiveness analytics for AI Code Auto-Remediation."""
+    from app.fixes.analytics_service import FixAnalyticsService
+    svc = FixAnalyticsService()
+    metrics = await svc.compute_metrics(repository_slug=repository)
+    return {
+        "total_fix_requests": metrics.total_fix_requests,
+        "status_counts": metrics.status_counts,
+        "category_breakdown": metrics.category_breakdown,
+        "acceptance_rate": metrics.acceptance_rate,
+        "verification_success_rate": metrics.verification_success_rate,
+        "total_completed": metrics.total_completed,
+        "total_failed": metrics.total_failed,
+    }
+
+
+@router.get(
     "/fixes/{fix_request_id}",
     response_model=FixPreviewResponse,
     summary="Get detailed preview status of a FixRequest",
@@ -156,6 +179,7 @@ async def get_fix_preview(
     fix_request_id: str,
     service: FixService = Depends(get_fix_service),
 ) -> FixPreviewResponse:
+
     """Fetch current preview details, eligibility, and proposed patch for a FixRequest."""
     try:
         return service.get_fix_preview(fix_request_id)
@@ -243,3 +267,5 @@ async def reject_fix(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except FixStateError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+

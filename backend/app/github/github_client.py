@@ -202,9 +202,124 @@ class GitHubClient:
         endpoint = f"/repos/{owner}/{repo}/issues/{pull_number}/comments"
         return await self._request("POST", endpoint, json_data={"body": body})
 
+    async def create_git_ref(
+        self,
+        owner: str,
+        repo: str,
+        ref: str,
+        sha: str,
+    ) -> dict[str, Any]:
+        """Create a new Git reference (branch or tag).
+
+        POST /repos/{owner}/{repo}/git/refs
+        """
+        endpoint = f"/repos/{owner}/{repo}/git/refs"
+        ref_name = ref if ref.startswith("refs/") else f"refs/heads/{ref}"
+        payload = {
+            "ref": ref_name,
+            "sha": sha,
+        }
+        return await self._request("POST", endpoint, json_data=payload)
+
+    async def create_blob(
+        self,
+        owner: str,
+        repo: str,
+        content: str,
+        encoding: str = "utf-8",
+    ) -> dict[str, Any]:
+        """Create a blob object in GitHub Git database.
+
+        POST /repos/{owner}/{repo}/git/blobs
+        """
+        endpoint = f"/repos/{owner}/{repo}/git/blobs"
+        payload = {"content": content, "encoding": encoding}
+        return await self._request("POST", endpoint, json_data=payload)
+
+    async def create_tree(
+        self,
+        owner: str,
+        repo: str,
+        base_tree: Optional[str],
+        tree_items: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Create a tree object in GitHub Git database.
+
+        POST /repos/{owner}/{repo}/git/trees
+        """
+        endpoint = f"/repos/{owner}/{repo}/git/trees"
+        payload: dict[str, Any] = {"tree": tree_items}
+        if base_tree:
+            payload["base_tree"] = base_tree
+        return await self._request("POST", endpoint, json_data=payload)
+
+    async def create_commit(
+        self,
+        owner: str,
+        repo: str,
+        message: str,
+        tree: str,
+        parents: list[str],
+    ) -> dict[str, Any]:
+        """Create a Git commit object in GitHub Git database.
+
+        POST /repos/{owner}/{repo}/git/commits
+        """
+        endpoint = f"/repos/{owner}/{repo}/git/commits"
+        payload = {
+            "message": message,
+            "tree": tree,
+            "parents": parents,
+        }
+        return await self._request("POST", endpoint, json_data=payload)
+
+    async def update_ref(
+        self,
+        owner: str,
+        repo: str,
+        ref: str,
+        sha: str,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        """Update a Git reference to point to a new commit SHA.
+
+        PATCH /repos/{owner}/{repo}/git/refs/{ref}
+        Safety Rule: force is False by default; force pushing is strictly forbidden for fix branches.
+        """
+        ref_path = ref.replace("refs/heads/", "").replace("refs/", "")
+        endpoint = f"/repos/{owner}/{repo}/git/refs/heads/{ref_path}"
+        payload = {"sha": sha, "force": force}
+        return await self._request("PATCH", endpoint, json_data=payload)
+
+    async def create_pull_request(
+        self,
+        owner: str,
+        repo: str,
+        title: str,
+        body: str,
+        head: str,
+        base: str,
+        draft: bool = False,
+    ) -> dict[str, Any]:
+        """Create a new Pull Request on GitHub.
+
+        POST /repos/{owner}/{repo}/pulls
+        """
+        endpoint = f"/repos/{owner}/{repo}/pulls"
+        payload = {
+            "title": title,
+            "body": body,
+            "head": head,
+            "base": base,
+            "draft": draft,
+        }
+        return await self._request("POST", endpoint, json_data=payload)
+
+
     # ------------------------------------------------------------------
     # Private Helper Methods & Retry Logic
     # ------------------------------------------------------------------
+
 
     async def _request(
         self,
