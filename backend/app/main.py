@@ -115,6 +115,7 @@ def create_app() -> FastAPI:
     from app.api.analytics_router import router as analytics_router
     from app.api.dashboard_router import router as dashboard_router
     from app.api.export_router import router as export_router
+    from app.api.fixes_router import router as fixes_router
     from app.api.history_router import router as history_router
     from app.api.repository_router import router as repository_router
 
@@ -129,6 +130,9 @@ def create_app() -> FastAPI:
     app.include_router(analytics_router, prefix="/api", tags=["Analytics"])
     app.include_router(export_router, prefix="/api/v1", tags=["Export"])
     app.include_router(export_router, prefix="/api", tags=["Export"])
+    app.include_router(fixes_router, prefix="/api/v1", tags=["Fixes"])
+    app.include_router(fixes_router, prefix="/api", tags=["Fixes"])
+
 
     # ── Health check ─────────────────────────────────────────────────────
     @app.get("/health", tags=["Health"])
