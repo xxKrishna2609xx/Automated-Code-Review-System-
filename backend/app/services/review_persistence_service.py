@@ -20,14 +20,11 @@ import time
 from typing import Optional
 
 from app.db.review_repository import ReviewRepository
+from app.exceptions import ReviewPersistenceError  # noqa: F401 – re-exported for backward compat
 from app.models.agent_models import FinalReview
 from app.models.persistence_models import PersistedReview
 
 logger = logging.getLogger(__name__)
-
-
-class ReviewPersistenceError(Exception):
-    """Raised when persistence of a review fails."""
 
 
 class ReviewPersistenceService:

@@ -26,10 +26,6 @@ from app.models.persistence_models import PersistedReview
 router = APIRouter()
 
 
-def get_review_repository() -> ReviewRepository:
-    """Dependency factory for ReviewRepository."""
-    return ReviewRepository()
-
 
 # ---------------------------------------------------------------------------
 # API DTO Models

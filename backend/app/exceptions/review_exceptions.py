@@ -11,3 +11,7 @@ from __future__ import annotations
 
 class ReviewServiceError(Exception):
     """Raised when the review execution pipeline fails at the service level."""
+
+
+class ReviewPersistenceError(Exception):
+    """Raised when persistence of a review into MongoDB fails."""

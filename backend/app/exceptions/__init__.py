@@ -21,7 +21,7 @@ from app.exceptions.github_exceptions import (
     GitHubRateLimitError,
     GitHubValidationError,
 )
-from app.exceptions.review_exceptions import ReviewServiceError
+from app.exceptions.review_exceptions import ReviewPersistenceError, ReviewServiceError
 
 __all__ = [
     "GeminiServiceError",
@@ -36,4 +36,5 @@ __all__ = [
     "GitHubRateLimitError",
     "GitHubValidationError",
     "ReviewServiceError",
+    "ReviewPersistenceError",
 ]

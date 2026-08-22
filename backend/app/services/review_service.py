@@ -26,16 +26,16 @@ import logging
 import time
 from typing import Optional
 
-from app.ai.gemini_service import (
+from app.ai.gemini_service import GeminiService
+from app.exceptions import (
     EmptyDiffError,
     GeminiAuthError,
     GeminiParseError,
     GeminiRateLimitError,
-    GeminiService,
     GeminiServiceError,
     GeminiTimeoutError,
 )
-from app.models.review_models import Issue, ReviewRequest, ReviewResponse, Severity
+from app.models.review_models import ReviewRequest, ReviewResponse
 from app.utils import (
     detect_language_from_diff,
     normalise_diff,
@@ -43,18 +43,6 @@ from app.utils import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Severity ordering (used for post-processing sort)
-# ---------------------------------------------------------------------------
-
-_SEVERITY_ORDER: dict[str, int] = {
-    Severity.CRITICAL: 0,
-    Severity.HIGH: 1,
-    Severity.MEDIUM: 2,
-    Severity.LOW: 3,
-}
 
 
 # ---------------------------------------------------------------------------
